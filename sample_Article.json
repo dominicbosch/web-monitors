@@ -1,0 +1,46 @@
+{
+	"info": {
+		"count": 1,
+		"page": 1,
+		"pages": 1
+	},
+	"items": {
+		"Article": {
+			"story_id": 431211413,
+			"published_at": "2016-04-19 09:11:23",
+			"lead": "Die vierte Industrielle Revolution macht Schluss mit\nder alten  Gesellschaftsordnung von Adel,\nB\u00fcrgertum und Arbeiter. Quer durch alle Schichten entsteht eine neue gef\u00e4hrliche Klasse: das Prekariat.",
+			"title": "Der Neoliberalismus hat ein neues politisches Monster gezeugt: Das Prekariat",
+			"upper_title": "",
+			"background": "\/imgdb\/e176\/Qx,A,93,94,1549,2237,607,641,467,468\/5592171997808215",
+			"discussion_id": 431211413,
+			"share_image": "\/imgdb\/7260\/Qx,A,93,94,1549,2237,607,641,467,468;JPEG\/5592171997808215",
+			"share_text": "Der Neoliberalismus hat ein neues politisches Monster gezeugt: Das Prekariat",
+			"external_link": "",
+			"share_link": "http:\/\/wat.is\/-6U5wzmRA",
+			"link": "http:\/\/www.watson.ch\/!431211413",
+			"comments_count": 251,
+			"tags": [{
+				"id": 287,
+				"name": "Wirtschaft",
+				"navi_tag": true
+			}, {
+				"id": 471,
+				"name": "Lifestyle",
+				"navi_tag": false
+			}, {
+				"id": 921,
+				"name": "Digitales",
+				"navi_tag": false
+			}, {
+				"id": 500,
+				"name": "Best of watson",
+				"navi_tag": false
+			}],
+			"authors": ["Philipp L\u00f6pfe"],
+			"social_shares": {
+				"facebook": 2621,
+				"twitter": 0
+			}
+		}
+	}
+}

@@ -1,4 +1,4 @@
-# Proposed data structure for data mining
+# Proposed data structure for data mining at news sites
 
 Since we intend to store data over long time we need to keep as few data as possible in memory in the index structure. But since we do only store events (change in the data) we need to keep a state in memory in order to derive a change.
 
@@ -9,7 +9,8 @@ Will also be kept in memory and removed from there if article is not monitored/e
 {
 	"100104638": {
 		"id": "100104638",
-		"href": "/Schweiz/Migration/100104638-40%27000-Fl%C3%BCchltlinge-erwartet--Bundesrat-verst%C3%A4rkt-Grenzwache",
+		"title": "Der Neoliberalismus hat ein neues politisches Monster gezeugt: Das Prekariat",
+		"link": "http:\/\/www.watson.ch\/!431211413",
 		"tags": [ "Schweiz", "Migration" ],
 		"showup": 1464235183678,
 		"comments": {

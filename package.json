@@ -1,0 +1,28 @@
+{
+  "name": "web-monitors",
+  "version": "1.0.0",
+  "description": "monitoring the web",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dominicbosch/web-monitors.git"
+  },
+  "keywords": [
+    "web",
+    "observatory"
+  ],
+  "author": "Dominic Bosch",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/dominicbosch/web-monitors/issues"
+  },
+  "homepage": "https://github.com/dominicbosch/web-monitors#readme",
+  "dependencies": {
+    "cheerio": "^0.20.0",
+    "firebase": "^3.0.5",
+    "needle": "^1.0.0"
+  }
+}
