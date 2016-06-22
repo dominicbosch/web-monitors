@@ -132,13 +132,15 @@ function getComments(oArticle, retry) {
 		else {
 			try {
 				let arrComm = resp.body.items.Comments;	// the new comments from the webapi
-				let comments = oArticle.comments;
+				// Here below comments could be empty if index has been fetched initially from the DB on startup
+				// this is because the DB doesn't store empty objects! so also not the property it is attached to!
+				let comments = oArticle.comments || {};
 				let measurement = {
 					timestamp: (new Date()).getTime(),
 					// here below it gets complicated as we update the index structure as well as a measurement point ;)
 					comments: arrComm.filter(function(o) {
-							if(!oArticle.comments[o.id]) oArticle.comments[o.id] = {};
-							let commIdx = oArticle.comments[o.id];
+							if(!comments[o.id]) comments[o.id] = {};
+							let commIdx = comments[o.id];
 							// If either not yet existing, or different upvote count, or different downvote count
 							// i.e. we only store deltas (events)
 							if(commIdx.upvotes!==o.love || commIdx.downvotes!==o.hate) {
