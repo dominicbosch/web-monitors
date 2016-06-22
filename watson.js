@@ -65,7 +65,8 @@ function persistComments(id, obj) {
 function unleakString(s) { return (' ' + s).substr(1); }
 
 exports.checkArticles = function() {
-	console.log('['+(new Date()).getTime()+'] Checking articles');
+	let dt = (new Date()).getTime();
+	console.log('['+dt+'] Checking articles, next check at '+(new Date(dt+interval)));
 	let articleSelector = '.teaser';
 
 	needle.get(baseURI, function(err, resp) {
