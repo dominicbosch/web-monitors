@@ -137,11 +137,11 @@ function getComments(oArticle, retry) {
 					timestamp: (new Date()).getTime(),
 					// here below it gets complicated as we update the index structure as well as a measurement point ;)
 					comments: arrComm.filter(function(o) {
+							if(!oArticle.comments[o.id]) oArticle.comments[o.id] = {};
 							let commIdx = oArticle.comments[o.id];
 							// If either not yet existing, or different upvote count, or different downvote count
 							// i.e. we only store deltas (events)
-							if(!commIdx || commIdx.upvotes!==o.love || commIdx.downvotes!==o.hate) {
-								if(!commIdx) commIdx = oArticle.comments[o.id] = {};
+							if(commIdx.upvotes!==o.love || commIdx.downvotes!==o.hate) {
 								commIdx.text = o.comment;
 								commIdx.upvotes = o.love;
 								commIdx.downvotes = o.hate;
