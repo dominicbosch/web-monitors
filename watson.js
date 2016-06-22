@@ -11,8 +11,9 @@ const baseURI = 'http://www.watson.ch/';
 const apiURI = baseURI+'api/1.0/';
 const interval = 10*60*1000; // every ten minutes
 const duration = 5*24*60*60*1000; // measure for five days for each article
-const articleIndex = {}; // index of currently tracked articles and their comments
 
+// index of currently tracked articles and their comments
+let articleIndex;
 // the current day represents all the measurements of the current day
 let currentDay;
 
@@ -170,8 +171,14 @@ function getComments(oArticle, retry) {
 
 }
 
-// Finally execute first and then set an interval as defined
-exports.checkArticles();
-setInterval(exports.checkArticles, interval);
+// Let's check for an existing index and load it if found
+db.ref(dbkey+'/article-index').once('value', function(dataSnapshot) {
+	// if day exists we use it as object or otherwise we create a new object
+	articleIndex = dataSnapshot.exists() ? dataSnapshot.val() : {};
+
+	// Finally execute first and then set an interval as previously defined
+	exports.checkArticles();
+	setInterval(exports.checkArticles, interval);
+});
 
 
