@@ -22,13 +22,13 @@ firebase.initializeApp({
 });
 
 const db = firebase.database(); // We use firebase as a DB
-
+const dbkey = '/watson';
 
 /* 
  * Persists an article index. We do it ID-wise in order to save computation
  */
 function persistArticle(id) {
-	db.ref('/article-index/'+id).set(articleIndex[id]);
+	db.ref(dbkey+'/article-index/'+id).set(articleIndex[id]);
 }
 
 /* 
@@ -37,7 +37,7 @@ function persistArticle(id) {
 function persistComments(id, obj) {
 	// a day stamp at the beginning of the day under which all measurements of this day are stored
 	let daystamp = (new Date()).setHours(0, 0, 0, 0);
-	let refToday = db.ref('/article-history/'+daystamp);
+	let refToday = db.ref(dbkey+'/article-history/'+daystamp);
 
 	function updateCurrentDay() {
 		if(!currentDay.data[id]) currentDay.data[id] = [];
