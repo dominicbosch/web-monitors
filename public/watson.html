@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Watson Visualization</title>
+	<!-- <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script> -->
+	<script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+	<script src="d3.tip.js" charset="utf-8"></script>
+	<!-- <script type="text/javascript" src="metricsgraphics.min.js"></script> -->
+	<!-- <link rel="stylesheet" type="text/css" href="metricsgraphics.css"> -->
+
+	<script src="https://www.gstatic.com/firebasejs/live/3.0/firebase.js"></script>
+	<script>
+		var dt = (new Date());
+		console.log('tsoffset', dt.getTimezoneOffset());
+	// Initialize Firebase
+	var config = {
+		apiKey: "AIzaSyCMPKu-q93uUyDu_Zgh6v7SW0ToKWM-_2k",
+		authDomain: "data-mining-44c9c.firebaseapp.com",
+		databaseURL: "https://data-mining-44c9c.firebaseio.com",
+		storageBucket: "data-mining-44c9c.appspot.com",
+	};
+
+	firebase.initializeApp(config);
+	var db = firebase.database();
+	var index = db.ref('/watson/article-index');
+	var history = db.ref('/watson/article-index');
+
+	var articleIndex = {};
+	index.once('value', function(snap) {
+		console.log('whole index', snap.val());
+	});
+
+	// Whenever an article is added to the index or updated, we maintain it here
+	function updateArticleIndex(snap) {
+		var art = snap.val();
+		articleIndex[art.id] = art;
+		console.log('updating article '+art.id);
+	}
+// 	index.on('child_added', function(snap) {
+// 		var art = snap.val();
+// 		articleIndex[art.id] = art;
+// 	}
+// );
+	index.on('child_added', updateArticleIndex);
+	index.on('child_changed', updateArticleIndex);
+
+	// creates the key required to access the firebase history
+	function getFirebaseIdOfPastDay(numDays) {
+		var dt = (new Date());
+		console.log('tsoffset', dt.getTimezoneOffset());
+		return dt.setHours(-numDays*24, -dt.getTimezoneOffset(), 0, 0);
+	}
+	console.log(getFirebaseIdOfPastDay(0));
+	console.log(getFirebaseIdOfPastDay(1));
+	console.log(getFirebaseIdOfPastDay(2));
+	console.log(getFirebaseIdOfPastDay(3));
+	</script>
+
+	<style>
+
+body {
+	font: 10px sans-serif;
+}
+
+#chart_div {
+	position: absolute;
+	top: 0;
+	left: 200px;
+}
+
+.axis path,
+.axis line {
+	stroke-width: 1.5px;
+	fill: none;
+	stroke: #000;
+	shape-rendering: crispEdges;
+}
+
+.x.axis path {
+	display: none;
+}
+
+.line {
+	opacity: 0.4;
+	fill: none;
+	stroke: steelblue;
+	stroke-width: 2.5px;
+	cursor: pointer;
+}
+#tooltip {
+	position: absolute;
+	opacity: 0;
+	padding: 3px 5px;
+	background: white;
+	border: 1px solid;
+}
+#adjust {
+	padding: 3px 6px;
+	color: white;
+	background: rgba(0, 0, 177, 0.7);
+	border-radius: 4px;
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	cursor: pointer;
+	font-weight: bold;
+}
+#tags {
+	position: absolute;
+	top: 40px;
+	left: 10px;
+	cursor: pointer;
+}
+#tags div {
+	padding: 1px 2px;
+}
+#tags .active {
+	background: rgba(0, 30, 255, 0.2);
+}
+#records {
+	position: absolute;
+	left: 300px;
+	top: 40px;
+	padding: 4px 8px;
+	font-size: 1.7em;
+	font-weight: bold;
+	color: white;
+	background-color: #456;
+}
+</style>
+</head>
+<body>
+<div id="adjust">Time Adjust</div>
+<div id="tags"></div>
+<div id="chart_div"></div>
+<div id="records"></div>
+<div id="tooltip"></div>
+<script type="text/javascript">
+
+
+var margin = {top: 20, right: 80, bottom: 30, left: 50},
+	width = 1560 - margin.left - margin.right,
+	height = 1200 - margin.top - margin.bottom;
+
+var arrSelectedTags = [];
+var data;
+var parseDate = d3.time.format("%Y%m%d").parse;
+
+var x = d3.time.scale()
+	.range([0, width]);
+
+var y = d3.scale.linear()
+	.range([height, 0]);
+
+var color = d3.scale.category20();
+
+var xAxis = d3.svg.axis()
+	.scale(x)
+	.orient("bottom");
+
+var yAxis = d3.svg.axis()
+	.scale(y)
+	.orient("left");
+
+var line = d3.svg.line()
+	// .interpolate("monotone")
+	// .interpolate("step")
+	.interpolate("linear")
+	// .interpolate("basis")
+	.x(function(d) { return x(d[property]); })
+	.y(function(d) { return y(d.value); });
+
+var svg = d3.select("#chart_div").append("svg")
+	.attr("width", width + margin.left + margin.right)
+	.attr("height", height + margin.top + margin.bottom)
+	.append("g")
+	.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+var property = 'date';
+var adjust = d3.select("#adjust");
+adjust.on('click', function() {
+	if(adjust.text() === 'Time Adjust') {
+		adjust.text('No Time Adjust');
+		property = 'elapsed';
+	} else {
+		adjust.text('Time Adjust');
+		property = 'date';
+	}
+	selectTime();
+	updateDataSet();
+});
+
+function selectTime() {
+	x.domain([
+		d3.min(data, function(d) {
+			return d3.min(d.values, function(d) { return d[property] })
+		}),
+		d3.max(data, function(d) {
+			return d3.max(d.values, function(d) { return d[property] })
+		})
+	]);
+	d3.select('.x.axis').call(xAxis);
+}
+
+var tooltip = d3.select('#tooltip');
+var tip = d3.tip()
+  .attr('class', 'd3-tip')
+  .offset([-10, 0])
+  .html(function(d) {
+    return "<strong>Article (click to view):</strong> <span style='color:darkgreen'>" + d.name + "</span>";
+  })
+
+svg.call(tip);
+function updateDataSet() {
+	d3.selectAll('.article path').transition().attr("d", function(d) { return line(d.values) });
+	var filtered = data.filter(function(d) {
+		return (arrSelectedTags.indexOf(d.tag1)>-1 || arrSelectedTags.indexOf(d.tag2)>-1)
+	})
+	var article = svg.selectAll(".article")
+		.data(filtered, function(d) { return d.name });
+	article.exit().remove();
+	article.enter().append("g")
+		.attr("class", "article")
+		.append("path")
+		.attr("class", "line")
+		.attr("d", function(d) { return line(d.values); })
+		.style("stroke", function(d) { return color(d.name); })
+		.attr("title", function(d) { return d.name })
+		.on("click", function(d) {
+			window.open(d.href);
+		})
+		// .on("mouseover", function(d) {
+		// 	tooltip.text(d.name).style({
+		// 		opacity: 1,
+		// 		left: d3.event.offsetX+20+'px',
+		// 		top: d3.event.offsetY+20+'px'
+		// 	})
+		// })
+		// .on("mouseout", function(d) { tooltip.style({ opacity: 0}) })
+		.on("mouseover", tip.show)
+		.on("mouseout", tip.hide)
+
+	d3.select('#records').text('Number of displayed articles: '+filtered.length)
+}
+
+
+d3.json("articles.json", function(err, obj) {
+	if(err) throw err;
+
+	var oTags = {};
+	data = Object.keys(obj).map(function (key) {
+		var name, tag1, tag2;
+		var href = obj[key].href;
+		var arr = href.split('/');
+		// var i = href.indexOf(key);
+		if(arr.length > 2) {
+			name = decodeURI(arr[3].substr(key.length))
+				// .replace(/\//g, ' ')
+				.replace(/-/g, ' ')
+				.trim();
+
+			tag1 = decodeURI(arr[1]);
+			tag2 = decodeURI(arr[2]);
+			oTags[tag1] = true;
+			oTags[tag2] = true;
+		} else {
+			name = arr[1];
+			tag1 = null;
+			tag2 = null;
+		}
+
+		return {
+			name: name,
+			href: 'https://www.watson.ch'+href,
+			tag1: tag1,
+			tag2: tag2,
+			values: obj[key].numComments.map(function(o) {
+				return {
+					date: new Date(o.timestamp),
+					elapsed: new Date(o.timestamp) - obj[key].showup,
+					value: o.num
+				}
+			})
+		};
+	});
+
+	arrSelectedTags = [].concat(Object.keys(oTags)).sort(function (a, b) {
+		return a.toLowerCase().localeCompare(b.toLowerCase()); // case insensitive sorting
+	});
+	d3.select('#tags').selectAll('div')
+		.data(['Select All', 'Select None'].concat(arrSelectedTags)).enter()
+		.append('div').attr('class', 'active')
+		.text(function(d) { return d })
+		.on('click', function(d) {
+			if(d === 'Select All') {
+				arrSelectedTags = [].concat(Object.keys(oTags));
+				d3.select('#tags').selectAll('div').attr('class', 'active');
+				d3.select('#tags :nth-child(2)').attr('class', null);
+
+			} else if(d === 'Select None') {
+				arrSelectedTags = [];
+				d3.select('#tags').selectAll('div').attr('class', null);
+				d3.select('#tags :nth-child(2)').attr('class', 'active');
+			} else {
+				var i = arrSelectedTags.indexOf(d);
+				if(i > -1) {
+					arrSelectedTags.splice(i, 1);
+				} else {
+					arrSelectedTags.push(d);
+				}
+				d3.selectAll('#tags div').attr('class', function(d) {
+					return (arrSelectedTags.indexOf(d) > -1 ? 'active' : null)
+				});
+
+				if(arrSelectedTags.length === Object.keys(oTags).length) {
+					d3.select('#tags :nth-child(1)').attr('class', 'active');
+				} else {
+					d3.select('#tags :nth-child(1)').attr('class', null);
+				}
+			}
+			updateDataSet();
+		});
+
+	d3.select('#tags :nth-child(1)').style('font-weight', 'bold');
+	d3.select('#tags :nth-child(2)').attr('class', null).style('font-weight', 'bold');
+	color.domain(d3.keys(data.map(function(o) { return o.name })));
+
+	selectTime('date');
+
+	y.domain([
+		d3.min(data, function(d) {
+			return d3.min(d.values, function(d) { return d.value })
+		}),
+		d3.max(data, function(d) {
+			return d3.max(d.values, function(d) { return d.value })
+		})
+	]);
+
+	svg.append("g")
+		.attr("class", "x axis")
+		.attr("transform", "translate(0," + height + ")")
+		.call(xAxis);
+
+	svg.append("g")
+		.attr("class", "y axis")
+		.call(yAxis)
+		.append("text")
+		.attr("transform", "rotate(-90)")
+		.attr("y", 6)
+		.attr("dy", ".71em")
+		.style("text-anchor", "end")
+		.text("Number of Comments");
+
+	updateDataSet();
+
+});
+
+
+</script> 
+</body>
+</html>
