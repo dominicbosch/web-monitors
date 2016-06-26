@@ -10,62 +10,32 @@
 
 	<script src="https://www.gstatic.com/firebasejs/live/3.0/firebase.js"></script>
 	<script>
-		var dt = (new Date());
-		console.log('tsoffset', dt.getTimezoneOffset());
-	// Initialize Firebase
-	var config = {
-		apiKey: "AIzaSyCMPKu-q93uUyDu_Zgh6v7SW0ToKWM-_2k",
-		authDomain: "data-mining-44c9c.firebaseapp.com",
-		databaseURL: "https://data-mining-44c9c.firebaseio.com",
-		storageBucket: "data-mining-44c9c.appspot.com",
-	};
+		// Initialize Firebase
+		var config = {
+			apiKey: "AIzaSyCMPKu-q93uUyDu_Zgh6v7SW0ToKWM-_2k",
+			authDomain: "data-mining-44c9c.firebaseapp.com",
+			databaseURL: "https://data-mining-44c9c.firebaseio.com",
+			storageBucket: "data-mining-44c9c.appspot.com",
+		};
 
-	firebase.initializeApp(config);
-	var db = firebase.database();
-	var index = db.ref('/watson/article-index');
-	var history = db.ref('/watson/article-index');
-
-	var articleIndex = {};
-	index.once('value', function(snap) {
-		console.log('whole index', snap.val());
-	});
-
-	// Whenever an article is added to the index or updated, we maintain it here
-	function updateArticleIndex(snap) {
-		var art = snap.val();
-		articleIndex[art.id] = art;
-		console.log('updating article '+art.id);
-	}
-// 	index.on('child_added', function(snap) {
-// 		var art = snap.val();
-// 		articleIndex[art.id] = art;
-// 	}
-// );
-	index.on('child_added', updateArticleIndex);
-	index.on('child_changed', updateArticleIndex);
-
-	// creates the key required to access the firebase history
-	function getFirebaseIdOfPastDay(numDays) {
-		var dt = (new Date());
-		console.log('tsoffset', dt.getTimezoneOffset());
-		return dt.setHours(-numDays*24, -dt.getTimezoneOffset(), 0, 0);
-	}
-	console.log(getFirebaseIdOfPastDay(0));
-	console.log(getFirebaseIdOfPastDay(1));
-	console.log(getFirebaseIdOfPastDay(2));
-	console.log(getFirebaseIdOfPastDay(3));
+		firebase.initializeApp(config);
+		var db = firebase.database();
 	</script>
 
 	<style>
 
 body {
-	font: 10px sans-serif;
+	font: 12px sans-serif;
+}
+
+svg {
 }
 
 #chart_div {
+	border: 1px solid;
 	position: absolute;
-	top: 0;
-	left: 200px;
+	top: 100;
+	left: 50px;
 }
 
 .axis path,
@@ -94,57 +64,263 @@ body {
 	background: white;
 	border: 1px solid;
 }
-#adjust {
-	padding: 3px 6px;
-	color: white;
-	background: rgba(0, 0, 177, 0.7);
-	border-radius: 4px;
-	position: absolute;
-	top: 10px;
-	left: 10px;
-	cursor: pointer;
-	font-weight: bold;
-}
 #tags {
 	position: absolute;
-	top: 40px;
+	z-index: 100;
+	top: 100px;
 	left: 10px;
-	cursor: pointer;
+	width: 200px;
+	height: 300px;
+	overflow-x: hidden;
+	overflow-y: scroll;
+	white-space: nowrap;
+	background: rgba(255, 255, 255, 0.9);
 }
+
 #tags div {
 	padding: 1px 2px;
+	cursor: pointer;
+	/*width: auto;*/
 }
+
+#tags .choice {
+	font-weight: bold;
+}
+
 #tags .active {
 	background: rgba(0, 30, 255, 0.2);
 }
 #records {
-	position: absolute;
-	left: 300px;
-	top: 40px;
-	padding: 4px 8px;
-	font-size: 1.7em;
+	padding: 2px 4px;
+	font-size: 1.4em;
 	font-weight: bold;
-	color: white;
-	background-color: #456;
+	/*color: #456;*/
 }
+
+#controls {
+    vertical-align: middle;
+}
+#controls * {
+    cursor: pointer;
+}
+.arrow {
+    vertical-align: middle;
+	padding: 2px;
+	border: 1px solid lightgrey;
+	height: 19px;
+	width: auto;
+}
+button {
+	vertical-align: middle;
+	height: 25px;
+	width: auto;
+}
+button.pressed {
+	background: darkgrey;
+}
+
 </style>
 </head>
 <body>
-<div id="adjust">Time Adjust</div>
-<div id="tags"></div>
-<div id="chart_div"></div>
+<h1>Feedback Intensity of News Articles</h1>
+<div id="controls">
+	<button id="tagstitle" class="pressed" onclick="showTags(false)">Tags</button>
+	<button id="but1" onclick="setDays(1)">1 Day</button>
+	<button id="but5" class="pressed" onclick="setDays(5)">5 Days</button>
+<!--	<img class="arrow" src="arrow_left.png" />
+	<img class="arrow" src="arrow_right.png" />-->
+</div>
 <div id="records"></div>
+<div id="tags">
+	<div class="choice">Select All</div>
+	<div class="choice">Select None</div>
+</div>
+<div id="chart_div"></div>
 <div id="tooltip"></div>
 <script type="text/javascript">
 
 
 var margin = {top: 20, right: 80, bottom: 30, left: 50},
-	width = 1560 - margin.left - margin.right,
-	height = 1200 - margin.top - margin.bottom;
+	width = 1400 - margin.left - margin.right,
+	height = 750 - margin.top - margin.bottom;
 
-var arrSelectedTags = [];
-var data;
 var parseDate = d3.time.format("%Y%m%d").parse;
+
+// We maintain two data structures (one array and one object) for faster access on certain tasks
+var oHistory;
+var arrHistory = [];
+var articleIndex = {};
+var arrArticles = [];
+var tagsIndex = [];
+var arrSelectedTags = [];
+var tagInit = false;
+var numberOfDays = 5;
+
+var index = db.ref('/watson/article-index');
+
+index.on('child_added', updateArticleIndex);
+index.on('child_changed', updateArticleIndex);
+
+// Whenever an article is added to the index or updated, we maintain it here
+function updateArticleIndex(snap) {
+	var art = snap.val();
+	articleIndex[art.id] = art;
+	if(art.comments) art.numComments = Object.keys(art.comments).length;
+	if(art.numComments === 192) console.log(art);
+	var arrIds = arrArticles.map(function(d) { return d.id });
+	if(arrIds.indexOf(art.id) === -1) arrArticles.push(art);
+	console.log('updating article "'+art.title+'"');
+	updateTagsList();
+	// updateDataSet();
+}
+
+// Updates the tag list on the right side, through which data can be limited
+function updateTagsList() {
+	var dt = (new Date()).getTime();
+
+	// We need to extract tags from all articles and count their occurence
+	// in order to sort the list later, thus two data structures are needed for fast
+	// computation
+	tagsIndex = [];
+	var oTags = {};
+	arrArticles.map(function(d) {
+		for(var i = 0; i < d.tags.length; i++) {
+			if(!oTags[d.tags[i]]) oTags[d.tags[i]] = 0;
+			oTags[d.tags[i]]++;
+		}
+	});
+	for(var el in oTags) {
+		tagsIndex.push({ name: el, num: oTags[el] });
+	}
+
+	if(!tagInit) arrSelectedTags = tagsIndex
+		.sort(function(a, b){return b.num-a.num})
+		.slice(0, 10).map(function(d) { return d.name });
+	
+	var d3Tags = d3.select('#tags').selectAll('div.data')
+		.data(tagsIndex, function(d) { return d.name });
+
+	d3Tags.enter().append('div').attr('class', 'data');
+	d3Tags.exit().remove();
+	d3Tags.sort(function(a, b){return b.num-a.num});
+	d3Tags.attr('class', function(d) {
+			return (arrSelectedTags.indexOf(d.name) > -1) ? 'data active' : 'data';
+		})
+		.text(function(d) { return d.name+' : '+d.num });
+
+	// console.log('Tag list update took: '+((new Date()).getTime()-dt)+'ms');
+
+}
+
+
+
+// Handle controls
+var showTags = function(doIt) {
+	// Maintain tag button state
+	d3.select('#tagstitle')
+		.attr('class', doIt ? 'pressed' : null)
+		.attr('onclick', 'showTags('+(!doIt)+')');
+	d3.select('#tags').transition().style('left', doIt ? '10px' : '-200px');
+}
+
+function setDays(n) {
+	numberOfDays = n;
+	d3.select('#but1').attr('class', n===1 ? 'pressed' : null);
+	d3.select('#but5').attr('class', n===5 ? 'pressed' : null);
+	var p = null;
+	var currentDay = n-1;
+	oHistory = {};
+	function getHistory() {
+		db.ref('/watson/article-history/'+getFirebaseIdOfPastDay(currentDay))
+			.once('value', processDay);
+	}
+	function processDay(snap) {
+		var obj = snap.val();
+
+		for(var el in obj) {
+			if(!oHistory[el]) {
+				oHistory[el] = {
+					article: articleIndex[el],
+					arrHist: obj[el],
+					arrNumComments: [],
+					oHist: {}
+				};
+			} else {
+				oHistory[el].arrHist = oHistory[el].arrHist.concat(obj[el]);
+			}
+		}
+		if(--currentDay >= 0) getHistory();
+		else {
+			// we received all required days and create an array of the whole history
+			// per article for easier d3 processing
+			// I know it is bad... but we do need to transform the data to get the num of comments per data point
+			var oComm; // the temporary comment index
+			var comm, hist;
+			arrHistory = [];
+			for(var el in oHistory){ 
+				oComm = {}; // the temporary comment index per article
+				hist = oHistory[el].arrHist;
+				arrHistory.push(oHistory[el]);
+				for(var j = 0; j < hist.length; j++) {
+					for(var i = 0; i < hist[j].comments.length; i++) {
+						comm = hist[j].comments[i];
+						comm.timestamp = hist[j].timestamp;
+						if(!oComm[comm.id]) {
+							oComm[comm.id] = [];
+							oHistory[el].oHist[comm.id] = oComm[comm.id];
+						}
+						oComm[comm.id].push(comm);
+					}
+					oHistory[el].arrNumComments.push({
+						timestamp: hist[j].timestamp,
+						num: Object.keys(oComm).length
+					});
+				}
+			}
+			console.log('Retrieved '+arrHistory.length+' article histories');
+			updateDataSet();
+		}
+	}
+	getHistory(processDay);
+}
+
+// creates the key required to access the firebase history
+function getFirebaseIdOfPastDay(numDays) {
+	var dt = (new Date());
+	return dt.setHours(-numDays*24, -dt.getTimezoneOffset(), 0, 0);
+}
+
+d3.select('#tags').selectAll('div')
+	.on('click', function(d) {
+		tagInit = true; // after this we do not automatically maintain top 10 tags selection anymore
+		if(d === 'Select All') {
+			// arrSelectedTags = [].concat(Object.keys(oTags));
+			// d3.select('#tags').selectAll('div').attr('class', 'active');
+			// d3.select('#tags :nth-child(2)').attr('class', null);
+
+		} else if(d === 'Select None') {
+			// arrSelectedTags = [];
+			// d3.select('#tags').selectAll('div').attr('class', null);
+			// d3.select('#tags :nth-child(2)').attr('class', 'active');
+		} else {
+			// var i = arrSelectedTags.indexOf(d);
+			// if(i > -1) {
+			// 	arrSelectedTags.splice(i, 1);
+			// } else {
+			// 	arrSelectedTags.push(d);
+			// }
+			// d3.selectAll('#tags div').attr('class', function(d) {
+			// 	return (arrSelectedTags.indexOf(d) > -1 ? 'active' : null)
+			// });
+
+			// if(arrSelectedTags.length === Object.keys(oTags).length) {
+			// 	d3.select('#tags :nth-child(1)').attr('class', 'active');
+			// } else {
+			// 	d3.select('#tags :nth-child(1)').attr('class', null);
+			// }
+		}
+		updateDataSet();
+	});
 
 var x = d3.time.scale()
 	.range([0, width]);
@@ -156,205 +332,97 @@ var color = d3.scale.category20();
 
 var xAxis = d3.svg.axis()
 	.scale(x)
-	.orient("bottom");
+	.orient('bottom');
 
 var yAxis = d3.svg.axis()
 	.scale(y)
-	.orient("left");
+	.orient('left');
 
 var line = d3.svg.line()
 	// .interpolate("monotone")
 	// .interpolate("step")
-	.interpolate("linear")
+	.interpolate('linear')
 	// .interpolate("basis")
-	.x(function(d) { return x(d[property]); })
-	.y(function(d) { return y(d.value); });
+	.x(function(d) { return x(d.date) })
+	.y(function(d) { return y(d.value) });
 
-var svg = d3.select("#chart_div").append("svg")
-	.attr("width", width + margin.left + margin.right)
-	.attr("height", height + margin.top + margin.bottom)
+var svg = d3.select('#chart_div').append('svg')
+	.attr('width', width + margin.left + margin.right)
+	.attr('height', height + margin.top + margin.bottom)
 	.append("g")
-	.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+	.attr('transform', 'translate('+margin.left+','+margin.top+')');
 
-var property = 'date';
-var adjust = d3.select("#adjust");
-adjust.on('click', function() {
-	if(adjust.text() === 'Time Adjust') {
-		adjust.text('No Time Adjust');
-		property = 'elapsed';
-	} else {
-		adjust.text('Time Adjust');
-		property = 'date';
-	}
-	selectTime();
-	updateDataSet();
-});
-
-function selectTime() {
-	x.domain([
-		d3.min(data, function(d) {
-			return d3.min(d.values, function(d) { return d[property] })
-		}),
-		d3.max(data, function(d) {
-			return d3.max(d.values, function(d) { return d[property] })
-		})
-	]);
-	d3.select('.x.axis').call(xAxis);
-}
 
 var tooltip = d3.select('#tooltip');
 var tip = d3.tip()
-  .attr('class', 'd3-tip')
-  .offset([-10, 0])
-  .html(function(d) {
-    return "<strong>Article (click to view):</strong> <span style='color:darkgreen'>" + d.name + "</span>";
-  })
-
+	.attr('class', 'd3-tip')
+	.offset([-10, 0])
+	.html(function(d) {
+		return '<span style="color:darkblue">'+d.article.title+'</span>';
+	});
 svg.call(tip);
+
 function updateDataSet() {
-	d3.selectAll('.article path').transition().attr("d", function(d) { return line(d.values) });
-	var filtered = data.filter(function(d) {
-		return (arrSelectedTags.indexOf(d.tag1)>-1 || arrSelectedTags.indexOf(d.tag2)>-1)
-	})
-	var article = svg.selectAll(".article")
-		.data(filtered, function(d) { return d.name });
+	var arrFiltered = arrHistory.filter(function(d) {
+		var hasTag = d.article.tags.some(function(d) { return arrSelectedTags.indexOf(d)>-1 });
+		return hasTag && d.arrNumComments[0].num < 10 && d.article.numComments > 7;
+	});
+	d3.select('#records').text('Number of displayed articles: '+arrFiltered.length);
+
+
+	x.domain([new Date(getFirebaseIdOfPastDay(numberOfDays-1)), new Date()]);
+	console.log(x.domain());
+	d3.select('.x.axis').call(xAxis);
+
+	y.domain([0, d3.max(arrFiltered, function(d) { return d.article.numComments || 0 }) ]);
+	console.log(y.domain());
+	d3.select('.y.axis').call(yAxis);
+
+	var article = svg.selectAll('.article')
+		.data(arrFiltered, function(d) { return d.article.id });
 	article.exit().remove();
-	article.enter().append("g")
-		.attr("class", "article")
-		.append("path")
-		.attr("class", "line")
-		.attr("d", function(d) { return line(d.values); })
-		.style("stroke", function(d) { return color(d.name); })
-		.attr("title", function(d) { return d.name })
-		.on("click", function(d) {
-			window.open(d.href);
-		})
-		// .on("mouseover", function(d) {
-		// 	tooltip.text(d.name).style({
-		// 		opacity: 1,
-		// 		left: d3.event.offsetX+20+'px',
-		// 		top: d3.event.offsetY+20+'px'
-		// 	})
-		// })
-		// .on("mouseout", function(d) { tooltip.style({ opacity: 0}) })
-		.on("mouseover", tip.show)
-		.on("mouseout", tip.hide)
+	article.enter().append('g')
+		.attr('class', 'article')
+		.append('path')
+		.attr('class', 'line')
+		.attr('id', function(d) { return d.article.id })
+		.style('stroke', function(d) { return color(d.article.title); })
+		.on('click', function(d) { window.open(d.href) })
+		.on('mouseover', tip.show)
+		.on('mouseout', tip.hide);
 
-	d3.select('#records').text('Number of displayed articles: '+filtered.length)
-}
-
-
-d3.json("articles.json", function(err, obj) {
-	if(err) throw err;
-
-	var oTags = {};
-	data = Object.keys(obj).map(function (key) {
-		var name, tag1, tag2;
-		var href = obj[key].href;
-		var arr = href.split('/');
-		// var i = href.indexOf(key);
-		if(arr.length > 2) {
-			name = decodeURI(arr[3].substr(key.length))
-				// .replace(/\//g, ' ')
-				.replace(/-/g, ' ')
-				.trim();
-
-			tag1 = decodeURI(arr[1]);
-			tag2 = decodeURI(arr[2]);
-			oTags[tag1] = true;
-			oTags[tag2] = true;
-		} else {
-			name = arr[1];
-			tag1 = null;
-			tag2 = null;
-		}
-
-		return {
-			name: name,
-			href: 'https://www.watson.ch'+href,
-			tag1: tag1,
-			tag2: tag2,
-			values: obj[key].numComments.map(function(o) {
+	article.selectAll('path')
+		.attr('d', function(d) {
+			return line(d.arrNumComments.map(function(d) {
 				return {
-					date: new Date(o.timestamp),
-					elapsed: new Date(o.timestamp) - obj[key].showup,
-					value: o.num
+					date: d.timestamp,
+					value: d.num
 				}
-			})
-		};
-	});
-
-	arrSelectedTags = [].concat(Object.keys(oTags)).sort(function (a, b) {
-		return a.toLowerCase().localeCompare(b.toLowerCase()); // case insensitive sorting
-	});
-	d3.select('#tags').selectAll('div')
-		.data(['Select All', 'Select None'].concat(arrSelectedTags)).enter()
-		.append('div').attr('class', 'active')
-		.text(function(d) { return d })
-		.on('click', function(d) {
-			if(d === 'Select All') {
-				arrSelectedTags = [].concat(Object.keys(oTags));
-				d3.select('#tags').selectAll('div').attr('class', 'active');
-				d3.select('#tags :nth-child(2)').attr('class', null);
-
-			} else if(d === 'Select None') {
-				arrSelectedTags = [];
-				d3.select('#tags').selectAll('div').attr('class', null);
-				d3.select('#tags :nth-child(2)').attr('class', 'active');
-			} else {
-				var i = arrSelectedTags.indexOf(d);
-				if(i > -1) {
-					arrSelectedTags.splice(i, 1);
-				} else {
-					arrSelectedTags.push(d);
-				}
-				d3.selectAll('#tags div').attr('class', function(d) {
-					return (arrSelectedTags.indexOf(d) > -1 ? 'active' : null)
-				});
-
-				if(arrSelectedTags.length === Object.keys(oTags).length) {
-					d3.select('#tags :nth-child(1)').attr('class', 'active');
-				} else {
-					d3.select('#tags :nth-child(1)').attr('class', null);
-				}
-			}
-			updateDataSet();
+			}))
 		});
 
-	d3.select('#tags :nth-child(1)').style('font-weight', 'bold');
-	d3.select('#tags :nth-child(2)').attr('class', null).style('font-weight', 'bold');
-	color.domain(d3.keys(data.map(function(o) { return o.name })));
+	color.domain(d3.keys(arrFiltered.map(function(o) { console.log(o); return o.article.title })));
 
-	selectTime('date');
-
-	y.domain([
-		d3.min(data, function(d) {
-			return d3.min(d.values, function(d) { return d.value })
-		}),
-		d3.max(data, function(d) {
-			return d3.max(d.values, function(d) { return d.value })
-		})
-	]);
-
-	svg.append("g")
-		.attr("class", "x axis")
-		.attr("transform", "translate(0," + height + ")")
+	svg.append('g')
+		.attr('class', 'x axis')
+		.attr('transform', 'translate(0,'+height+')')
 		.call(xAxis);
 
-	svg.append("g")
-		.attr("class", "y axis")
+	svg.append('g')
+		.attr('class', 'y axis')
 		.call(yAxis)
-		.append("text")
-		.attr("transform", "rotate(-90)")
-		.attr("y", 6)
-		.attr("dy", ".71em")
-		.style("text-anchor", "end")
-		.text("Number of Comments");
+		.append('text')
+		.attr('transform', 'rotate(-90)')
+		.attr('y', 6)
+		.attr('dy', '.71em')
+		.style('text-anchor', 'end')
+		.text('Number of Comments');
+	
+	showTags(false);
+	
+}
 
-	updateDataSet();
-
-});
-
+setDays(5);
 
 </script> 
 </body>
