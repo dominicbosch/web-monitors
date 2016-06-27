@@ -28,9 +28,6 @@ body {
 	font: 12px sans-serif;
 }
 
-svg {
-}
-
 #chart_div {
 	/*border: 1px solid;*/
 	padding-left: 50px;
@@ -50,9 +47,12 @@ svg {
 .x.axis path {
 	/*display: none;*/
 }
-
+g.article {
+	opacity: 0.6;
+	cursor: pointer;
+}
 .line {
-	opacity: 0.4;
+	opacity: 0.8;
 	fill: none;
 	stroke: steelblue;
 	stroke-width: 2.5px;
@@ -176,7 +176,7 @@ function updateArticleIndex(snap) {
 	console.log('updating article "'+art.title+'"');
 	updateTagsList();
 	d3.select('#commentdiv').text('Last modified article: "'+art.title+'"');
-	d3.select('#article_'+art.id).style('opacity', 0).transition().style('opacity', 1);
+	d3.select('#article_'+art.id).style('opacity', 0).transition().style('opacity', 0.6);
 	// updateDataSet();
 }
 
@@ -410,13 +410,15 @@ function updateDataSet() {
 	article.exit().remove();
 	var d3Art = article.enter().append('g')
 		.attr('class', 'article')
-		.attr('id', function(d) { return 'article_'+d.article.id });
+		.attr('id', function(d) { return 'article_'+d.article.id })
+		.on('mouseover', function(d) { d3.select(this).style('opacity', 1)})
+		.on('mouseout', function(d) { d3.select(this).style('opacity', 0.6)});
 
 	d3Art.append('path')
 		.attr('class', 'area')
 		.style('stroke', 'none')
 		.style('fill', function(d) { return color(d.article.title); })
-		.style('opacity', 0.3)
+		.style('opacity', 0.7)
 		.on('click', function(d) { window.open(d.article.link) })
 		.on('mouseover', tip.show)
 		.on('mouseout', tip.hide);
