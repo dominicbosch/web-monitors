@@ -32,10 +32,11 @@ svg {
 }
 
 #chart_div {
-	border: 1px solid;
-	position: absolute;
+	/*border: 1px solid;*/
+	padding-left: 50px;
+/*	position: absolute;
 	top: 100;
-	left: 50px;
+	left: 50px;*/
 }
 
 .axis path,
@@ -47,7 +48,7 @@ svg {
 }
 
 .x.axis path {
-	display: none;
+	/*display: none;*/
 }
 
 .line {
@@ -118,6 +119,9 @@ button {
 button.pressed {
 	background: darkgrey;
 }
+.d3-tip {
+	background: white;
+}
 
 </style>
 </head>
@@ -136,6 +140,7 @@ button.pressed {
 	<div class="choice">Select None</div>
 </div>
 <div id="chart_div"></div>
+<div id="commentdiv"></div>
 <div id="tooltip"></div>
 <script type="text/javascript">
 
@@ -166,11 +171,12 @@ function updateArticleIndex(snap) {
 	var art = snap.val();
 	articleIndex[art.id] = art;
 	if(art.comments) art.numComments = Object.keys(art.comments).length;
-	if(art.numComments === 192) console.log(art);
 	var arrIds = arrArticles.map(function(d) { return d.id });
 	if(arrIds.indexOf(art.id) === -1) arrArticles.push(art);
 	console.log('updating article "'+art.title+'"');
 	updateTagsList();
+	d3.select('#commentdiv').text('Last modified article: "'+art.title+'"');
+	d3.select('#article_'+art.id).style('opacity', 0).transition().style('opacity', 1);
 	// updateDataSet();
 }
 
@@ -254,10 +260,10 @@ function setDays(n) {
 			// we received all required days and create an array of the whole history
 			// per article for easier d3 processing
 			// I know it is bad... but we do need to transform the data to get the num of comments per data point
-			var oComm; // the temporary comment index
-			var comm, hist;
+			var oComm, newEl; // the temporary comment index
+			var comm, hist, offs, ocel;
 			arrHistory = [];
-			for(var el in oHistory){ 
+			for(var el in oHistory){
 				oComm = {}; // the temporary comment index per article
 				hist = oHistory[el].arrHist;
 				arrHistory.push(oHistory[el]);
@@ -271,11 +277,20 @@ function setDays(n) {
 						}
 						oComm[comm.id].push(comm);
 					}
-					oHistory[el].arrNumComments.push({
+					newEl = {
 						timestamp: hist[j].timestamp,
 						num: Object.keys(oComm).length
-					});
+					};
+					newEl.upvotes = 0;
+					newEl.downvotes = 0;
+					for(var elc in oComm) {
+						ocel = oComm[elc];
+						newEl.upvotes += ocel[ocel.length-1].upvotes || 0;
+						newEl.downvotes += ocel[ocel.length-1].downvotes || 0;
+					}
+					oHistory[el].arrNumComments.push(newEl);
 				}
+				oHistory[el].offset = oHistory[el].article.numComments-Object.keys(oComm).length;
 			}
 			console.log('Retrieved '+arrHistory.length+' article histories');
 			updateDataSet();
@@ -352,6 +367,18 @@ var svg = d3.select('#chart_div').append('svg')
 	.append("g")
 	.attr('transform', 'translate('+margin.left+','+margin.top+')');
 
+var d3xAxis = svg.append('g')
+	.attr('class', 'x axis')
+	.attr('transform', 'translate(0,'+height+')');
+
+var d3yAxis = svg.append('g')
+	.attr('class', 'y axis')
+	.append('text')
+	.attr('transform', 'rotate(-90)')
+	.attr('y', 6)
+	.attr('dy', '.71em')
+	.style('text-anchor', 'end')
+	.text('Number of Comments');
 
 var tooltip = d3.select('#tooltip');
 var tip = d3.tip()
@@ -365,7 +392,7 @@ svg.call(tip);
 function updateDataSet() {
 	var arrFiltered = arrHistory.filter(function(d) {
 		var hasTag = d.article.tags.some(function(d) { return arrSelectedTags.indexOf(d)>-1 });
-		return hasTag && d.arrNumComments[0].num < 10 && d.article.numComments > 7;
+		return hasTag && d.arrNumComments[0].num < 10 && d.article.numComments > 20;
 	});
 	d3.select('#records').text('Number of displayed articles: '+arrFiltered.length);
 
@@ -381,42 +408,60 @@ function updateDataSet() {
 	var article = svg.selectAll('.article')
 		.data(arrFiltered, function(d) { return d.article.id });
 	article.exit().remove();
-	article.enter().append('g')
+	var d3Art = article.enter().append('g')
 		.attr('class', 'article')
-		.append('path')
-		.attr('class', 'line')
-		.attr('id', function(d) { return d.article.id })
-		.style('stroke', function(d) { return color(d.article.title); })
-		.on('click', function(d) { window.open(d.href) })
+		.attr('id', function(d) { return 'article_'+d.article.id });
+
+	d3Art.append('path')
+		.attr('class', 'area')
+		.style('stroke', 'none')
+		.style('fill', function(d) { return color(d.article.title); })
+		.style('opacity', 0.3)
+		.on('click', function(d) { window.open(d.article.link) })
 		.on('mouseover', tip.show)
 		.on('mouseout', tip.hide);
 
-	article.selectAll('path')
+	d3Art.append('path')
+		.attr('class', 'line')
+		.style('stroke', function(d) { return color(d.article.title) });
+
+	article.selectAll('path.line')
 		.attr('d', function(d) {
-			return line(d.arrNumComments.map(function(d) {
+			return line(d.arrNumComments.map(function(dl) {
 				return {
-					date: d.timestamp,
-					value: d.num
+					date: dl.timestamp,
+					value: dl.num+d.offset
 				}
 			}))
 		});
+	article.selectAll('path.area').each(function(d) {
+		var lastel = d.arrNumComments[d.arrNumComments.length-1];
+		if(lastel.upvotes < 100 || lastel.downvotes < 50) {
+			d3.select(this).remove();
+		}
+	})
+	article.selectAll('path.area')
+		.attr('d', function(d) {
+			var arr = d.arrNumComments.map(function(dl) {
+				var votes = dl.downvotes===0 ? 0 : (Math.log(dl.downvotes)<2 ? 0 : Math.log(dl.downvotes)-2);
+				return {
+					date: dl.timestamp,
+					value: d.offset+dl.num-votes
+				}
+			}).concat(d.arrNumComments.map(function(dl) {
+				var votes = dl.upvotes===0 ? 0 : (Math.log(dl.upvotes)<3 ? 0 : Math.log(dl.upvotes)-3);
+				return {
+					date: dl.timestamp,
+					value: d.offset+dl.num+votes
+				}
+			}).reverse());
+			return line(arr)
+		});
 
-	color.domain(d3.keys(arrFiltered.map(function(o) { console.log(o); return o.article.title })));
+	color.domain(d3.keys(arrFiltered.map(function(o) { return o.article.title })));
 
-	svg.append('g')
-		.attr('class', 'x axis')
-		.attr('transform', 'translate(0,'+height+')')
-		.call(xAxis);
-
-	svg.append('g')
-		.attr('class', 'y axis')
-		.call(yAxis)
-		.append('text')
-		.attr('transform', 'rotate(-90)')
-		.attr('y', 6)
-		.attr('dy', '.71em')
-		.style('text-anchor', 'end')
-		.text('Number of Comments');
+	d3xAxis.call(xAxis);
+	d3yAxis.call(yAxis);
 	
 	showTags(false);
 	
