@@ -49,7 +49,12 @@ body {
 }
 g.article {
 	opacity: 0.6;
+	transition: opacity .3s ease-out;
 	cursor: pointer;
+}
+g.article:hover {
+
+	opacity: 1;
 }
 .line {
 	opacity: 0.8;
@@ -58,12 +63,14 @@ g.article {
 	stroke-width: 2.5px;
 	cursor: pointer;
 }
-#tooltip {
-	position: absolute;
+.dot {
 	opacity: 0;
-	padding: 3px 5px;
-	background: white;
-	border: 1px solid;
+	transition: opacity .3s ease-out;
+    fill: grey;
+    stroke: darkblue;
+}
+.dot:hover {
+	opacity: 1;
 }
 #tags {
 	position: absolute;
@@ -121,6 +128,12 @@ button.pressed {
 }
 .d3-tip {
 	background: white;
+	border: 1px solid darkgrey;
+	box-shadow: 2px 2px 2px darkgrey;
+}
+.d3-tip td:nth-child(1) {
+	font-weight: bold;
+	white-space: nowrap;
 }
 
 </style>
@@ -131,8 +144,8 @@ button.pressed {
 	<button id="tagstitle" class="pressed" onclick="showTags(false)">Tags</button>
 	<button id="but1" onclick="setDays(1)">1 Day</button>
 	<button id="but5" class="pressed" onclick="setDays(5)">5 Days</button>
-<!--	<img class="arrow" src="arrow_left.png" />
-	<img class="arrow" src="arrow_right.png" />-->
+	<img class="arrow" src="arrow_left.png" />
+	<img class="arrow" src="arrow_right.png" />
 </div>
 <div id="records"></div>
 <div id="tags">
@@ -141,7 +154,7 @@ button.pressed {
 </div>
 <div id="chart_div"></div>
 <div id="commentdiv"></div>
-<div id="tooltip"></div>
+<!-- <div id="tooltip"></div> -->
 <script type="text/javascript">
 
 
@@ -190,9 +203,11 @@ function updateTagsList() {
 	tagsIndex = [];
 	var oTags = {};
 	arrArticles.map(function(d) {
-		for(var i = 0; i < d.tags.length; i++) {
-			if(!oTags[d.tags[i]]) oTags[d.tags[i]] = 0;
-			oTags[d.tags[i]]++;
+		if(d.tags) {
+			for(var i = 0; i < d.tags.length; i++) {
+				if(!oTags[d.tags[i]]) oTags[d.tags[i]] = 0;
+				oTags[d.tags[i]]++;
+			}
 		}
 	});
 	for(var el in oTags) {
@@ -380,18 +395,42 @@ var d3yAxis = svg.append('g')
 	.style('text-anchor', 'end')
 	.text('Number of Comments');
 
-var tooltip = d3.select('#tooltip');
-var tip = d3.tip()
+// var tooltip = d3.select('#tooltip');
+var tipArticle = d3.tip()
 	.attr('class', 'd3-tip')
 	.offset([-10, 0])
+	.direction('ne')
 	.html(function(d) {
-		return '<span style="color:darkblue">'+d.article.title+'</span>';
+		var com = d.arrNumComments[d.arrNumComments.length-1];
+		return '<table class="total">'
+			+ '<tr><td>Title: </td><td>'+d.article.title+'</td></tr>'
+			+ '<tr><td>Total #Comments: </td><td>'+com.num+'</td></tr>'
+			+ '<tr><td>Total #Upvotes: </td><td>'+com.upvotes+'</td></tr>'
+			+ '<tr><td>Total #Downvotes: </td><td>'+com.downvotes+'</td></tr>'
+			+ '</table>';
 	});
-svg.call(tip);
+var timeFormat = d3.time.format('');
+svg.call(tipArticle);
+var tipComment = d3.tip()
+	.attr('class', 'd3-tip')
+	.offset([-10, 0])
+	.direction('se')
+	.html(function(d) {
+		var par = d3.select(this.parentNode).datum();
+		// console.log(d);
+		return '<table>'
+			+ '<tr><td>Title: </td><td>'+par.article.title+'</td></tr>'
+			+ '<tr><td>#Comments: </td><td>'+d.num+'</td></tr>'
+			+ '<tr><td>#Upvotes: </td><td>'+d.upvotes+'</td></tr>'
+			+ '<tr><td>#Downvotes: </td><td>'+d.downvotes+'</td></tr>'
+			+ '<tr><td>Time: </td><td>'+timeFormat(new Date(d.timestamp))+'</td></tr>'
+			+ '</table>';
+	});
+svg.call(tipComment);
 
 function updateDataSet() {
 	var arrFiltered = arrHistory.filter(function(d) {
-		var hasTag = d.article.tags.some(function(d) { return arrSelectedTags.indexOf(d)>-1 });
+		var hasTag = !d.article.tags || d.article.tags.some(function(d) { return arrSelectedTags.indexOf(d)>-1 });
 		return hasTag && d.arrNumComments[0].num < 10 && d.article.numComments > 20;
 	});
 	d3.select('#records').text('Number of displayed articles: '+arrFiltered.length);
@@ -418,14 +457,28 @@ function updateDataSet() {
 		.attr('class', 'area')
 		.style('stroke', 'none')
 		.style('fill', function(d) { return color(d.article.title); })
-		.style('opacity', 0.7)
-		.on('click', function(d) { window.open(d.article.link) })
-		.on('mouseover', tip.show)
-		.on('mouseout', tip.hide);
+		.style('opacity', 0.7);
 
 	d3Art.append('path')
 		.attr('class', 'line')
 		.style('stroke', function(d) { return color(d.article.title) });
+
+	d3Art.selectAll('path')
+		.on('click', function(d) { window.open(d.article.link) })
+		.on('mouseover', tipArticle.show)
+		.on('mouseout', tipArticle.hide);
+
+	d3Art.selectAll('.dot')
+		.data(function(d) { return d.arrNumComments })
+		.enter()
+		.append('circle').attr('class', 'dot')
+			.attr('r', '4')
+			.attr('cx', function(d) { return x(d.timestamp) })
+			.attr('cy', function(d) { return y(d.num+d3.select(this.parentNode).datum().offset) })
+			.on('click', function(d) { window.open(d3.select(this.parentNode).datum().article.link) })
+			.on('mouseover', tipComment.show)
+			.on('mouseout', tipComment.hide);
+
 
 	article.selectAll('path.line')
 		.attr('d', function(d) {
@@ -436,29 +489,14 @@ function updateDataSet() {
 				}
 			}))
 		});
+
 	article.selectAll('path.area').each(function(d) {
 		var lastel = d.arrNumComments[d.arrNumComments.length-1];
 		if(lastel.upvotes < 100 || lastel.downvotes < 50) {
 			d3.select(this).remove();
 		}
-	})
-	article.selectAll('path.area')
-		.attr('d', function(d) {
-			var arr = d.arrNumComments.map(function(dl) {
-				var votes = dl.downvotes===0 ? 0 : (Math.log(dl.downvotes)<2 ? 0 : Math.log(dl.downvotes)-2);
-				return {
-					date: dl.timestamp,
-					value: d.offset+dl.num-votes
-				}
-			}).concat(d.arrNumComments.map(function(dl) {
-				var votes = dl.upvotes===0 ? 0 : (Math.log(dl.upvotes)<3 ? 0 : Math.log(dl.upvotes)-3);
-				return {
-					date: dl.timestamp,
-					value: d.offset+dl.num+votes
-				}
-			}).reverse());
-			return line(arr)
-		});
+	});
+	calculateAreas();
 
 	color.domain(d3.keys(arrFiltered.map(function(o) { return o.article.title })));
 
@@ -467,6 +505,33 @@ function updateDataSet() {
 	
 	showTags(false);
 	
+}
+
+function calculateAreas() {
+
+	d3.selectAll('.article path.area')
+		.attr('d', function(d) {
+			var arr = d.arrNumComments.map(function(dl) {
+				var votes = dl.downvotes/300;
+				// var votes = dl.downvotes===0 ? 0 : (Math.log(dl.downvotes)<2 ? 0 : Math.log(dl.downvotes)-2);
+				// var votes = dl.downvotes===0 ? 0 : (Math.log10(dl.downvotes)<0 ? 0 : Math.log10(dl.downvotes));
+				// var votes = dl.downvotes===0 ? 0 : (Math.log2(dl.downvotes)<0 ? 0 : Math.log2(dl.downvotes));				
+				return {
+					date: dl.timestamp,
+					value: d.offset+dl.num-votes
+				}
+			}).concat(d.arrNumComments.map(function(dl) {
+				var votes = dl.upvotes/300;
+				// var votes = dl.upvotes===0 ? 0 : (Math.log(dl.upvotes)<3 ? 0 : Math.log(dl.upvotes)-3);
+				// var votes = dl.upvotes===0 ? 0 : (Math.log10(dl.upvotes)<0 ? 0 : Math.log10(dl.upvotes));
+				// var votes = dl.upvotes===0 ? 0 : (Math.log2(dl.upvotes)<0 ? 0 : Math.log2(dl.upvotes));
+				return {
+					date: dl.timestamp,
+					value: d.offset+dl.num+votes
+				}
+			}).reverse());
+			return line(arr)
+		});
 }
 
 setDays(5);
