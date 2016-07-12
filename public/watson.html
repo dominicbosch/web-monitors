@@ -3,8 +3,9 @@
 <head>
 	<title>Watson Visualization</title>
 	<!-- <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script> -->
-	<script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
-	<script src="d3.tip.js" charset="utf-8"></script>
+	<!-- <script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script> -->
+	<script src="https://d3js.org/d3.v4.js"></script>
+	<!-- <script src="d3.tip.v4.js" charset="utf-8"></script> -->
 	<!-- <script type="text/javascript" src="metricsgraphics.min.js"></script> -->
 	<!-- <link rel="stylesheet" type="text/css" href="metricsgraphics.css"> -->
 
@@ -126,12 +127,18 @@ button {
 button.pressed {
 	background: darkgrey;
 }
-.d3-tip {
+.tooltip {
+	position: absolute;
+	opacity: 0;
+	transition: opacity .3s ease-out;
 	background: white;
 	border: 1px solid darkgrey;
 	box-shadow: 2px 2px 2px darkgrey;
 }
-.d3-tip td:nth-child(1) {
+.tooltip.active {
+	opacity: 1;
+}
+.tooltip td:nth-child(1) {
 	font-weight: bold;
 	white-space: nowrap;
 }
@@ -154,7 +161,7 @@ button.pressed {
 </div>
 <div id="chart_div"></div>
 <div id="commentdiv"></div>
-<!-- <div id="tooltip"></div> -->
+<div id="tooltip" class="tooltip"></div>
 <script type="text/javascript">
 
 
@@ -162,7 +169,7 @@ var margin = {top: 20, right: 80, bottom: 30, left: 50},
 	width = 1400 - margin.left - margin.right,
 	height = 750 - margin.top - margin.bottom;
 
-var parseDate = d3.time.format("%Y%m%d").parse;
+var parseDate = d3.timeFormat("%Y%m%d").parse;
 
 // We maintain two data structures (one array and one object) for faster access on certain tasks
 var oHistory;
@@ -173,6 +180,9 @@ var tagsIndex = [];
 var arrSelectedTags = [];
 var tagInit = false;
 var numberOfDays = 5;
+var allTags = false;
+var tooltip = d3.select('#tooltip');
+var toolTime = d3.timeFormat('%A, %B %e, %H:%M');
 
 var index = db.ref('/watson/article-index');
 
@@ -223,7 +233,7 @@ function updateTagsList() {
 
 	d3Tags.enter().append('div').attr('class', 'data');
 	d3Tags.exit().remove();
-	d3Tags.sort(function(a, b){return b.num-a.num});
+	d3Tags.sort(function(a, b){ return b.num-a.num });
 	d3Tags.attr('class', function(d) {
 			return (arrSelectedTags.indexOf(d.name) > -1) ? 'data active' : 'data';
 		})
@@ -322,8 +332,10 @@ function getFirebaseIdOfPastDay(numDays) {
 
 d3.select('#tags').selectAll('div')
 	.on('click', function(d) {
+		allTags = false;
 		tagInit = true; // after this we do not automatically maintain top 10 tags selection anymore
 		if(d === 'Select All') {
+			allTags = true;
 			// arrSelectedTags = [].concat(Object.keys(oTags));
 			// d3.select('#tags').selectAll('div').attr('class', 'active');
 			// d3.select('#tags :nth-child(2)').attr('class', null);
@@ -352,26 +364,28 @@ d3.select('#tags').selectAll('div')
 		updateDataSet();
 	});
 
-var x = d3.time.scale()
+var x = d3.scaleTime()
 	.range([0, width]);
 
-var y = d3.scale.linear()
+var y = d3.scaleLinear()
 	.range([height, 0]);
 
-var color = d3.scale.category20();
+var color =  d3.scaleOrdinal(d3.schemeCategory20);
 
-var xAxis = d3.svg.axis()
-	.scale(x)
-	.orient('bottom');
+// var xAxis = d3.svg.axis()
+// 	.scale(x)
+// 	.orient('bottom');
+var xAxis = d3.axisBottom(x);
 
-var yAxis = d3.svg.axis()
-	.scale(y)
-	.orient('left');
+// var yAxis = d3.svg.axis()
+// 	.scale(y)
+// 	.orient('left');
+var yAxis = d3.axisLeft(y);
 
-var line = d3.svg.line()
+var line = d3.line()
 	// .interpolate("monotone")
 	// .interpolate("step")
-	.interpolate('linear')
+	// .interpolate('linear')
 	// .interpolate("basis")
 	.x(function(d) { return x(d.date) })
 	.y(function(d) { return y(d.value) });
@@ -395,44 +409,16 @@ var d3yAxis = svg.append('g')
 	.style('text-anchor', 'end')
 	.text('Number of Comments');
 
-// var tooltip = d3.select('#tooltip');
-var tipArticle = d3.tip()
-	.attr('class', 'd3-tip')
-	.offset([-10, 0])
-	.direction('ne')
-	.html(function(d) {
-		var com = d.arrNumComments[d.arrNumComments.length-1];
-		return '<table class="total">'
-			+ '<tr><td>Title: </td><td>'+d.article.title+'</td></tr>'
-			+ '<tr><td>Total #Comments: </td><td>'+com.num+'</td></tr>'
-			+ '<tr><td>Total #Upvotes: </td><td>'+com.upvotes+'</td></tr>'
-			+ '<tr><td>Total #Downvotes: </td><td>'+com.downvotes+'</td></tr>'
-			+ '</table>';
-	});
-var timeFormat = d3.time.format('');
-svg.call(tipArticle);
-var tipComment = d3.tip()
-	.attr('class', 'd3-tip')
-	.offset([-10, 0])
-	.direction('se')
-	.html(function(d) {
-		var par = d3.select(this.parentNode).datum();
-		// console.log(d);
-		return '<table>'
-			+ '<tr><td>Title: </td><td>'+par.article.title+'</td></tr>'
-			+ '<tr><td>#Comments: </td><td>'+d.num+'</td></tr>'
-			+ '<tr><td>#Upvotes: </td><td>'+d.upvotes+'</td></tr>'
-			+ '<tr><td>#Downvotes: </td><td>'+d.downvotes+'</td></tr>'
-			+ '<tr><td>Time: </td><td>'+timeFormat(new Date(d.timestamp))+'</td></tr>'
-			+ '</table>';
-	});
-svg.call(tipComment);
 
 function updateDataSet() {
-	var arrFiltered = arrHistory.filter(function(d) {
-		var hasTag = !d.article.tags || d.article.tags.some(function(d) { return arrSelectedTags.indexOf(d)>-1 });
-		return hasTag && d.arrNumComments[0].num < 10 && d.article.numComments > 20;
-	});
+	var arrFiltered;
+	if(allTags) arrFiltered = arrHistory;
+	else {
+		arrFiltered = arrHistory.filter(function(d) {
+			var hasTag = !d.article.tags || d.article.tags.some(function(d) { return arrSelectedTags.indexOf(d)>-1 });
+			return hasTag && d.arrNumComments[0].num < 10 && d.article.numComments > 20;
+		});
+	}
 	d3.select('#records').text('Number of displayed articles: '+arrFiltered.length);
 
 
@@ -465,8 +451,8 @@ function updateDataSet() {
 
 	d3Art.selectAll('path')
 		.on('click', function(d) { window.open(d.article.link) })
-		.on('mouseover', tipArticle.show)
-		.on('mouseout', tipArticle.hide);
+		.on('mouseover', showArticle)
+		.on('mouseout', hideTooltip);
 
 	d3Art.selectAll('.dot')
 		.data(function(d) { return d.arrNumComments })
@@ -476,8 +462,8 @@ function updateDataSet() {
 			.attr('cx', function(d) { return x(d.timestamp) })
 			.attr('cy', function(d) { return y(d.num+d3.select(this.parentNode).datum().offset) })
 			.on('click', function(d) { window.open(d3.select(this.parentNode).datum().article.link) })
-			.on('mouseover', tipComment.show)
-			.on('mouseout', tipComment.hide);
+			.on('mouseover', showComment)
+			.on('mouseout', hideTooltip);
 
 
 	article.selectAll('path.line')
@@ -534,6 +520,37 @@ function calculateAreas() {
 		});
 }
 
+function showArticle(d) {
+	var com = d.arrNumComments[d.arrNumComments.length-1];
+	tooltip.attr('class', 'tooltip active')
+		.style({
+			top: d3.event.pageY+'px',
+			left: (d3.event.pageX+10)+'px'
+		});
+		//FIXME offset
+	tooltip.html('<table class="total">'
+				+ '<tr><td>Title: </td><td>'+d.article.title+'</td></tr>'
+				+ '<tr><td>Total #Comments: </td><td>'+(com.num+com.offset)+'</td></tr>'
+				+ '<tr><td>Total #Upvotes: </td><td>'+com.upvotes+'</td></tr>'
+				+ '<tr><td>Total #Downvotes: </td><td>'+com.downvotes+'</td></tr>'
+				+ '</table>');
+}
+function showComment(d) {
+	var par = d3.select(this.parentNode).datum();
+	tooltip.attr('class', 'tooltip active')
+		.style('top', d3.event.pageY+'px')
+		.style('left', (d3.event.pageX+10)+'px');
+	tooltip.html('<table>'
+				+ '<tr><td>Title: </td><td>'+par.article.title+'</td></tr>'
+				+ '<tr><td>#Comments: </td><td>'+d.num+par.offset+'</td></tr>'
+				+ '<tr><td>#Upvotes: </td><td>'+d.upvotes+'</td></tr>'
+				+ '<tr><td>#Downvotes: </td><td>'+d.downvotes+'</td></tr>'
+				+ '<tr><td>Time: </td><td>'+toolTime(new Date(d.timestamp))+'</td></tr>'
+				+ '</table>');
+}
+function hideTooltip() {
+	tooltip.attr('class', 'tooltip');
+}
 setDays(5);
 
 </script> 
