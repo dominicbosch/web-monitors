@@ -48,6 +48,13 @@ body {
 .x.axis path {
 	/*display: none;*/
 }
+.axis text {
+	font-size: 1.25em;
+}
+.axis text.label {
+	fill: black;
+	font-size: 1.5em;
+}
 g.article {
 	opacity: 0.6;
 	transition: opacity .3s ease-out;
@@ -165,7 +172,7 @@ button.pressed {
 <script type="text/javascript">
 
 
-var margin = {top: 20, right: 80, bottom: 30, left: 50},
+var margin = {top: 50, right: 80, bottom: 30, left: 70},
 	width = 1400 - margin.left - margin.right,
 	height = 750 - margin.top - margin.bottom;
 
@@ -192,11 +199,12 @@ index.on('child_changed', updateArticleIndex);
 // Whenever an article is added to the index or updated, we maintain it here
 function updateArticleIndex(snap) {
 	var art = snap.val();
+	// TODO why do we get articles back with no link and title'
 	articleIndex[art.id] = art;
 	if(art.comments) art.numComments = Object.keys(art.comments).length;
 	var arrIds = arrArticles.map(function(d) { return d.id });
 	if(arrIds.indexOf(art.id) === -1) arrArticles.push(art);
-	console.log('updating article "'+art.title+'"');
+	// console.log('updating article "'+art.title+'"');
 	updateTagsList();
 	d3.select('#commentdiv').text('Last modified article: "'+art.title+'"');
 	d3.select('#article_'+art.id).style('opacity', 0).transition().style('opacity', 0.6);
@@ -375,7 +383,8 @@ var color =  d3.scaleOrdinal(d3.schemeCategory20);
 // var xAxis = d3.svg.axis()
 // 	.scale(x)
 // 	.orient('bottom');
-var xAxis = d3.axisBottom(x);
+var xAxis = d3.axisBottom(x)
+	.tickFormat(d3.timeFormat('%a %b %e, %H:%M'));
 
 // var yAxis = d3.svg.axis()
 // 	.scale(y)
@@ -401,12 +410,15 @@ var d3xAxis = svg.append('g')
 	.attr('transform', 'translate(0,'+height+')');
 
 var d3yAxis = svg.append('g')
-	.attr('class', 'y axis')
-	.append('text')
+	.attr('class', 'y axis');
+
+d3yAxis.append('text')
 	.attr('transform', 'rotate(-90)')
-	.attr('y', 6)
+	.attr('class', 'label')
+	.attr('x', -height/2)
+	.attr('y', -50)
 	.attr('dy', '.71em')
-	.style('text-anchor', 'end')
+	.style('text-anchor', 'middle')
 	.text('Number of Comments');
 
 
@@ -450,7 +462,12 @@ function updateDataSet() {
 		.style('stroke', function(d) { return color(d.article.title) });
 
 	d3Art.selectAll('path')
-		.on('click', function(d) { window.open(d.article.link) })
+		.on('click', function(d) {
+			var parDat = d3.select(this.parentNode).datum();
+			var link = parDat.article.link;
+			if(!link) link = 'https://www.watson.ch/!'+parDat.article.id; 
+			window.open(link);
+		})
 		.on('mouseover', showArticle)
 		.on('mouseout', hideTooltip);
 
@@ -461,12 +478,16 @@ function updateDataSet() {
 			.attr('r', '4')
 			.attr('cx', function(d) { return x(d.timestamp) })
 			.attr('cy', function(d) { return y(d.num+d3.select(this.parentNode).datum().offset) })
-			.on('click', function(d) { window.open(d3.select(this.parentNode).datum().article.link) })
+			.on('click', function(d) {
+				var parDat = d3.select(this.parentNode).datum();
+				var link = parDat.article.link;
+				if(!link) link = 'https://www.watson.ch/!'+parDat.article.id; 
+				window.open(link);
+			})
 			.on('mouseover', showComment)
 			.on('mouseout', hideTooltip);
 
-
-	article.selectAll('path.line')
+	d3Art.selectAll('.line')
 		.attr('d', function(d) {
 			return line(d.arrNumComments.map(function(dl) {
 				return {
@@ -498,7 +519,7 @@ function calculateAreas() {
 	d3.selectAll('.article path.area')
 		.attr('d', function(d) {
 			var arr = d.arrNumComments.map(function(dl) {
-				var votes = dl.downvotes/300;
+				var votes = dl.downvotes/700;
 				// var votes = dl.downvotes===0 ? 0 : (Math.log(dl.downvotes)<2 ? 0 : Math.log(dl.downvotes)-2);
 				// var votes = dl.downvotes===0 ? 0 : (Math.log10(dl.downvotes)<0 ? 0 : Math.log10(dl.downvotes));
 				// var votes = dl.downvotes===0 ? 0 : (Math.log2(dl.downvotes)<0 ? 0 : Math.log2(dl.downvotes));				
@@ -507,7 +528,7 @@ function calculateAreas() {
 					value: d.offset+dl.num-votes
 				}
 			}).concat(d.arrNumComments.map(function(dl) {
-				var votes = dl.upvotes/300;
+				var votes = dl.upvotes/700;
 				// var votes = dl.upvotes===0 ? 0 : (Math.log(dl.upvotes)<3 ? 0 : Math.log(dl.upvotes)-3);
 				// var votes = dl.upvotes===0 ? 0 : (Math.log10(dl.upvotes)<0 ? 0 : Math.log10(dl.upvotes));
 				// var votes = dl.upvotes===0 ? 0 : (Math.log2(dl.upvotes)<0 ? 0 : Math.log2(dl.upvotes));
@@ -527,22 +548,23 @@ function showArticle(d) {
 			top: d3.event.pageY+'px',
 			left: (d3.event.pageX+10)+'px'
 		});
-		//FIXME offset
 	tooltip.html('<table class="total">'
 				+ '<tr><td>Title: </td><td>'+d.article.title+'</td></tr>'
-				+ '<tr><td>Total #Comments: </td><td>'+(com.num+com.offset)+'</td></tr>'
+				+ '<tr><td>Total #Comments: </td><td>'+(com.num+d.offset)+'</td></tr>'
 				+ '<tr><td>Total #Upvotes: </td><td>'+com.upvotes+'</td></tr>'
 				+ '<tr><td>Total #Downvotes: </td><td>'+com.downvotes+'</td></tr>'
 				+ '</table>');
 }
+// FIXME number of comments not correct, neither are the number uf up or downvotes...
 function showComment(d) {
 	var par = d3.select(this.parentNode).datum();
 	tooltip.attr('class', 'tooltip active')
 		.style('top', d3.event.pageY+'px')
 		.style('left', (d3.event.pageX+10)+'px');
+	console.log(d, par);
 	tooltip.html('<table>'
 				+ '<tr><td>Title: </td><td>'+par.article.title+'</td></tr>'
-				+ '<tr><td>#Comments: </td><td>'+d.num+par.offset+'</td></tr>'
+				+ '<tr><td>#Comments: </td><td>'+(d.num+par.offset)+'</td></tr>'
 				+ '<tr><td>#Upvotes: </td><td>'+d.upvotes+'</td></tr>'
 				+ '<tr><td>#Downvotes: </td><td>'+d.downvotes+'</td></tr>'
 				+ '<tr><td>Time: </td><td>'+toolTime(new Date(d.timestamp))+'</td></tr>'
