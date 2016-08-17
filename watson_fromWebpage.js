@@ -121,25 +121,22 @@ function getComments(oArticle, retry) {
 			try {
 				let tree = cheerio.load(resp.body);
 				
-				// First fetch some mor einformation about the article
-				if(!articleIndex[id].title || !articleIndex[id].tags) {
-					if(!articleIndex[id].title) {
-						articleIndex[id].title = unleakString(tree('h2.maintitle').text());
-					} 
-					if(!articleIndex[id].tags) {
-						articleIndex[id].tags = unleakString(tree('[name="news_keywords"]').attr('content')).split();
-					}
-					persistArticle(id);
+				// First fetch some more information about the article
+				if(!articleIndex[id].title) {
+					articleIndex[id].title = unleakString(tree('h2.maintitle').text());
+				} 
+				if(!articleIndex[id].tags) {
+					articleIndex[id].tags = unleakString(tree('[name="news_keywords"]').attr('content')).split(', ');
 				}
 				
 				let ts = (new Date()).getTime();
-				let comments = oArticle.comments = oArticle.comments || {};
+				if(!oArticle.comments) oArticle.comments = {};
 				let arrComments = [];
 
 				tree(commentSelector).each(function(i, o) {
 					let id = o.attribs['id'].substr(8)
-					if(!comments[id]) comments[id] = {};
-					let commIdx = comments[id];
+					if(!oArticle.comments[id]) oArticle.comments[id] = {};
+					let commIdx = oArticle.comments[id];
 					if(!commIdx.text) {
 						let content = tree(this).find('.text .content');
 						content.find('span').remove();
@@ -168,6 +165,7 @@ function getComments(oArticle, retry) {
 					comm: arrComments,
 					num: arrComments.length
 				};
+				persistArticle(id);
 				persistComments(id, state);
 
 			} catch(e) {
