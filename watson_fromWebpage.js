@@ -133,7 +133,7 @@ function getComments(oArticle, retry) {
 				}
 				
 				let ts = (new Date()).getTime();
-				let comments = oArticle.comments || {};
+				let comments = oArticle.comments = oArticle.comments || {};
 				let arrComments = [];
 
 				tree(commentSelector).each(function(i, o) {
