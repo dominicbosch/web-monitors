@@ -24,6 +24,7 @@
     "cheerio": "^0.20.0",
     "firebase": "^3.0.5",
     "moment": "^2.14.1",
-    "needle": "^1.0.0"
+    "needle": "^1.0.0",
+    "twitter": "^1.4.0"
   }
 }

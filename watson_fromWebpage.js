@@ -9,10 +9,10 @@ const firebase = require('firebase');
 const moment = require('moment');
 
 const baseURI = 'http://www.watson.ch/';
-const articleSelector = '.teaser';
-const commentSelector = 'ul.timeline li';
-const interval = 10*60*1000; // every ten minutes
+const interval = 1*60*1000; // every ten minutes
 const duration = 5*24*60*60*1000; // measure for five days for each article
+
+const theBeginning = (new Date()).getTime();
 
 // index of currently tracked articles and their comments
 let articleIndex;
@@ -74,13 +74,16 @@ function unleakString(s) { return (' '+s).substr(1); }
 
 exports.checkArticles = function() {
 	let dt = (new Date()).getTime();
+
+	let mem = process.memoryUsage();
+	// console.log('MEMUSAGE (MB): '+mem.heapUsed/1000/1000);
 	console.log('['+dt+'] Checking articles, next check at '+(new Date(dt+interval)));
 
 	needle.get(baseURI, function(err, resp) {
 		if(err) console.error('Error fetching "'+baseURI+'": '+err.message);
 		else {
 			let tree = cheerio.load(resp.body);
-			tree(articleSelector).each(function(i, o) {
+			tree('.teaser').each(function(i, o) {
 				let id = unleakString(o.attribs['data-story-id']);
 				if(id !== 'undefined') {
 					if(!articleIndex[id]) {
@@ -89,8 +92,7 @@ exports.checkArticles = function() {
 							link: baseURI+'!'+id,
 							title: null, // title will be added later in the next statement
 							tags: null,  // tags will be added later in the next statement
-							showup: (new Date()).getTime(),
-							comments: {}
+							showup: (new Date()).getTime()
 						};
 					}
 					let article = articleIndex[id];
@@ -98,6 +100,7 @@ exports.checkArticles = function() {
 						if(((new Date()).getTime()-article.showup) > duration) {
 							// We only track changes for a certain duration
 							// after this we remove the whole article object from the memory to save some space
+							if(articleIndex[id])
 							articleIndex[id] = { ended: true };
 						} else {
 							// random delay up to two thirds of the interval to spread the requests a bit over time
@@ -112,7 +115,12 @@ exports.checkArticles = function() {
 
 function getComments(oArticle, retry) {
 	let id = oArticle.id;
-	console.log('['+(new Date()).getTime()+'] Fetching comments for article '+id);
+	
+	let dt = (new Date()).getTime();
+	let mem = process.memoryUsage();
+	console.log('MEMUSAGE (MB)	'+((dt-theBeginning)/1000)+'	'+mem.heapUsed/1000/1000);
+
+	console.log('['+dt+'] Fetching comments for article '+id);
 	if(retry) console.log('Retrying article '+id);
 
 	needle.get(baseURI+'!'+id, function(err, resp) {
@@ -120,37 +128,41 @@ function getComments(oArticle, retry) {
 		else {
 			try {
 				let tree = cheerio.load(resp.body);
-				
+				let needsUpdate = false;
+
 				// First fetch some more information about the article
 				if(!articleIndex[id].title) {
 					articleIndex[id].title = unleakString(tree('h2.maintitle').text());
+					needsUpdate = true;
 				} 
 				if(!articleIndex[id].tags) {
 					articleIndex[id].tags = unleakString(tree('[name="news_keywords"]').attr('content')).split(', ');
+					needsUpdate = true;
 				}
 				
 				let ts = (new Date()).getTime();
 				if(!oArticle.comments) oArticle.comments = {};
 				let arrComments = [];
 
-				tree(commentSelector).each(function(i, o) {
-					let id = o.attribs['id'].substr(8)
+				tree('ul.timeline > li').each(function(i, o) {
+					let commentEl = tree(o);
+					let id = o.attribs['id'].substr(8);
 					if(!oArticle.comments[id]) oArticle.comments[id] = {};
 					let commIdx = oArticle.comments[id];
 					if(!commIdx.text) {
-						let content = tree(this).find('.text .content');
+						let content = commentEl.find('> .text > .content');
 						content.find('span').remove();
 						commIdx.text = unleakString(content.text().trim());
 					}
 					if(!commIdx.showup) {
-						let pub = moment(unleakString(tree(this).find('.commentdate').text()), 'dd.MM.yyyy HH:mm');
+						let pub = moment(unleakString(commentEl.find('> .text > .commentdate').text()), 'dd.MM.yyyy HH:mm');
 						commIdx.showup = ts;
 						commIdx.published = pub.valueOf();
 						commIdx.delay = ts - pub.valueOf();
 					}
 
-					let upvotes = parseInt(unleakString(tree(this).find('.love').text()));
-					let downvotes = parseInt(unleakString(tree(this).find('.hate').text()));
+					let upvotes = parseInt(unleakString(commentEl.find('> .text > .tools > .love').text()));
+					let downvotes = parseInt(unleakString(commentEl.find('> .text > .tools > .hate').text()));
 					commIdx.uv = upvotes;
 					commIdx.dv = downvotes;
 					arrComments.push({
@@ -159,13 +171,14 @@ function getComments(oArticle, retry) {
 						dv: downvotes
 					});
 				})
+				tree = null;
 
 				let state = {
 					ts: ts,
 					comm: arrComments,
 					num: arrComments.length
 				};
-				persistArticle(id);
+				if(needsUpdate) persistArticle(id);
 				persistComments(id, state);
 
 			} catch(e) {
