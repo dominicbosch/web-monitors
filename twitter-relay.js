@@ -14,7 +14,6 @@ try {
 		serviceAccount: '.credentials'
 	});
 
-	console.log('Starting Twitter Stream relay at '+(new Date())+' with PID #'+process.pid);
 
 	const db = firebase.database(); // We use firebase as a DB
 	const dbkey = '/twitter';
@@ -27,10 +26,13 @@ try {
 		if(str.length === 1) return 0+str;
 		else return str;
 	}
+	function getDateString(dt) {
+		return dt.getFullYear()+'-'+(zeroFill(dt.getMonth()+1))+'-'+zeroFill(dt.getDate());
+	}
 	let today = new Date();
-	let lastUpdate;
 	let id = 0;
 	let count = 0;
+	console.log('Starting Twitter Stream relay at '+today+' with PID #'+process.pid);
 	twitterStream.stream('statuses/filter', twitterFilter, function(stream) {
 		stream.on('data', function(data) {
 			if(data.user) {
@@ -44,8 +46,7 @@ try {
 				});
 				count++;
 				if(now.getDate() !== today.getDate()) {
-					let dt = now.getFullYear()+'-'+(zeroFill(now.getMonth()+1))+'-'+zeroFill(now.getDate());
-					console.log(dt+': '+count+' entries stored');
+					console.log(getDateString(today)+': '+count+' entries stored');
 					today = now;
 					count = 0;
 				}
