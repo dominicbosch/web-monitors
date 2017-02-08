@@ -4,6 +4,8 @@ const fs = require('fs');
 const twitter = require('twitter');
 const firebase = require('firebase');
 
+const twitterFilter = { track:'data science,data visualization' };
+
 try {
 	let twitterStream = new twitter(JSON.parse(fs.readFileSync('.twitterauth')));
 
@@ -20,22 +22,33 @@ try {
 	// PURGE ALL DATA:
 	// db.ref(dbkey).child('/posts/').remove();
 
-	/* 
-	 * Persists a post
-	 */
-	function persistArticle(id) {
+	function zeroFill(num) {
+		let str = num+'';
+		if(str.length === 1) return 0+str;
+		else return str;
 	}
-
+	let today = new Date();
+	let lastUpdate;
 	let id = 0;
-	twitterStream.stream('statuses/filter', { track:'data science,data visualization,big data,nodejs,node.js,realtime,nosql,firebase' }, function(stream) {
+	let count = 0;
+	twitterStream.stream('statuses/filter', twitterFilter, function(stream) {
 		stream.on('data', function(data) {
 			if(data.user) {
+				let now = new Date(); // should be UTC no matter where
+				// Store new entry @id
 				db.ref(dbkey+'/posts/'+id).set({
-					ts: (new Date()).getTime(), // should be UTC no matter where
+					ts: now.getTime(),
 					user: data.user.name,
 					tid: data.id_str,
 					msg: data.text
 				});
+				count++;
+				if(now.getDate() !== today.getDate()) {
+					let dt = now.getFullYear()+'-'+(zeroFill(now.getMonth()+1))+'-'+zeroFill(now.getDate());
+					console.log(dt+': '+count+' entries stored');
+					today = now;
+					count = 0;
+				}
 				id = (id + 1) % 100;
 			}
 		});
