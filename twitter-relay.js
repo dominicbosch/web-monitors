@@ -20,14 +20,21 @@ try {
 
 	const arrTwitterFilters = [
 		'data science',
-		'data visualization'
+		'data visualization',
+		'nodejs',
+		'realtime',
+		'node.js',
+		'big data',
+		'nosql',
+		'firebase'
 	];
 	let today = new Date();
 	let id = 0;
 	let count = 0;
 	let countFrame = 0;
-	let iFilter = 0;
+	let iFilter = 1;
 	let twitterStream;
+	let arrStreams = [];
 
 	// PURGE ALL DATA:
 	// db.ref(dbkey).child('/posts/').remove();
@@ -40,24 +47,20 @@ try {
 	function getDateString(dt) {
 		return dt.getFullYear()+'-'+(zeroFill(dt.getMonth()+1))+'-'+zeroFill(dt.getDate());
 	}
-	function addFilter() {
-		if(iFilter < arrTwitterFilters.length) {
-			let fltr = arrTwitterFilters[iFilter++];
-			let filter = { track: fltr };
-			arrStreams.push(twitterApp.stream('statuses/filter', filter, processStream));
-			console.log('Starting new twitter stream with filter "'+fltr+'"')
+	function updateStream() {
+		if(iFilter <= arrTwitterFilters.length) {
+			let fltrs = arrTwitterFilters.slice(0, iFilter).join(',');
+			if(twitterStream) twitterStream.destroy();
+			setTimeout(() => {
+				twitterApp.stream('statuses/filter', { track: fltrs }, processStream);
+				console.log('Starting new twitter stream with filters "'+fltrs+'"')
+			}, 1000)
 		} else console.log('Reached maximum available streams! ('+iFilter+')')
-	}
-	function removeFilter() {
-		arrStreams.pop().destroy();
-		iFilter--;
 	}
 	function processStream(stream) {
 		twitterStream = stream;
-		console.log(stream);
 		stream.on('data', function(data) {
 			if(data.user) {
-				console.log(data.user.name);
 				let now = new Date(); // should be UTC no matter where
 				// Store new entry @id
 				db.ref(dbkey+'/posts/'+id).set({
@@ -77,15 +80,21 @@ try {
 			}
 		});
 
-		stream.on('error', function(data) { console.log(data); });
+		stream.on('error', console.log);
 	}
 	console.log('Starting Twitter Stream relay at '+today+' with PID #'+process.pid);
-	addFilter();
+	updateStream();
 	setInterval(() => {
-		if(countFrame < 5) addFilter();
-		else if(countFrame > 20) removeFilter();
+		console.log(countFrame);
+		if(countFrame < 5) {
+			iFilter++;
+			updateStream();
+		} else if(countFrame > 30) {
+			iFilter--;
+			updateStream();
+		}
 		countFrame = 0;
-	}, 30000);
+	}, 10000);
 
 } catch(err) {
 	console.error(err.stack);
