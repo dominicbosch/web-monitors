@@ -1,4 +1,4 @@
-.credentials
 node_modules/
 *.log
-.twitterauth
+.credentials.json
+.twitterauth.json
