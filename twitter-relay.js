@@ -22,11 +22,11 @@ try {
 		'data science',
 		'data visualization',
 		'nodejs',
-		'realtime',
-		'node.js',
+		'firebase',
 		'big data',
+		'node.js',
 		'nosql',
-		'firebase'
+		'realtime'
 	];
 	let today = new Date();
 	let id = 0;
