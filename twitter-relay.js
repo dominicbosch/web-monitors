@@ -87,18 +87,18 @@ try {
 	updateStream();
 	setInterval(() => {
 
-		// if less than one post in 10 seconds arrived, we add one filter
-		if(countFrame < 1) {
+		// if less than six posts in 60 seconds arrived, we add one filter
+		if(countFrame < 6) {
 			iFilter++;
 			updateStream(countFrame);
 
-		// if more than five posts in 10 seconds arrived, we remove one filter
-		} else if(countFrame > 5) {
+		// if more than thirty posts in 60 seconds arrived, we remove one filter
+		} else if(countFrame > 30) {
 			iFilter--;
 			updateStream(countFrame);
 		}
 		countFrame = 0;
-	}, 10000);
+	}, 60000);
 
 } catch(err) {
 	console.error(err.stack);
