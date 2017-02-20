@@ -47,13 +47,14 @@ try {
 	function getDateString(dt) {
 		return dt.getFullYear()+'-'+(zeroFill(dt.getMonth()+1))+'-'+zeroFill(dt.getDate());
 	}
-	function updateStream() {
+	function updateStream(num) {
 		if(iFilter <= arrTwitterFilters.length) {
 			let fltrs = arrTwitterFilters.slice(0, iFilter).join(',');
 			if(twitterStream) twitterStream.destroy();
 			setTimeout(() => {
 				twitterApp.stream('statuses/filter', { track: fltrs }, processStream);
-				console.log('Starting new twitter stream with filters "'+fltrs+'"')
+				console.log('Starting new twitter stream with filters "'+fltrs+'", '
+					+' because we counted '+num+' in 10 seconds')
 			}, 1000)
 		} else console.log('Reached maximum available streams! ('+iFilter+')')
 	}
@@ -85,13 +86,16 @@ try {
 	console.log('Starting Twitter Stream relay at '+today+' with PID #'+process.pid);
 	updateStream();
 	setInterval(() => {
-		console.log(countFrame);
-		if(countFrame < 5) {
+
+		// if less than one post in 10 seconds arrived, we add one filter
+		if(countFrame < 1) {
 			iFilter++;
-			updateStream();
-		} else if(countFrame > 30) {
+			updateStream(countFrame);
+
+		// if more than five posts in 10 seconds arrived, we remove one filter
+		} else if(countFrame > 5) {
 			iFilter--;
-			updateStream();
+			updateStream(countFrame);
 		}
 		countFrame = 0;
 	}, 10000);
