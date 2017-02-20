@@ -54,7 +54,7 @@ try {
 			setTimeout(() => {
 				twitterApp.stream('statuses/filter', { track: fltrs }, processStream);
 				console.log('Starting new twitter stream with filters "'+fltrs+'", '
-					+' because we counted '+num+' in 10 seconds')
+					+' because we counted '+num+' in 60 seconds')
 			}, 1000)
 		} else console.log('Reached maximum available streams! ('+iFilter+')')
 	}
