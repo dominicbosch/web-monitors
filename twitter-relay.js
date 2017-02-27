@@ -57,7 +57,7 @@ try {
 			twitterApp.stream('statuses/filter', { track: fltrs }, processStream);
 			console.log((new Date()).toISOString()
 				+' | Starting new twitter stream with '+iFilter
-				+' filters "'+fltrs+'"'
+				+' filter'+(iFilter>1 ? 's' : '')+' "'+fltrs+'"'
 				+ (num ? ', because we counted '+num+' in 60 seconds' : '')
 			);
 		}, 1000)
