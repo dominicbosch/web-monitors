@@ -26,7 +26,10 @@ try {
 		'big data',
 		'node.js',
 		'nosql',
-		'realtime'
+		'realtime',
+		'machine learning',
+		'community detection',
+		'regression'
 	];
 	let today = new Date();
 	let id = 0;
@@ -48,17 +51,15 @@ try {
 		return dt.getFullYear()+'-'+(zeroFill(dt.getMonth()+1))+'-'+zeroFill(dt.getDate());
 	}
 	function updateStream(num) {
-		if(iFilter <= arrTwitterFilters.length) {
-			let fltrs = arrTwitterFilters.slice(0, iFilter).join(',');
-			if(twitterStream) twitterStream.destroy();
-			setTimeout(() => {
-				twitterApp.stream('statuses/filter', { track: fltrs }, processStream);
-				console.log((new Date()).toISOString()
-					+' | Starting new twitter stream with filters "'+fltrs+'"'
-					+ (num ? ', because we counted '+num+' in 60 seconds' : '')
-				);
-			}, 1000)
-		} else console.log('Reached maximum available streams! ('+iFilter+')')
+		let fltrs = arrTwitterFilters.slice(0, iFilter).join(',');
+		if(twitterStream) twitterStream.destroy();
+		setTimeout(() => {
+			twitterApp.stream('statuses/filter', { track: fltrs }, processStream);
+			console.log((new Date()).toISOString()
+				+' | Starting new twitter stream with filters "'+fltrs+'"'
+				+ (num ? ', because we counted '+num+' in 60 seconds' : '')
+			);
+		}, 1000)
 	}
 	function processStream(stream) {
 		twitterStream = stream;
@@ -91,8 +92,10 @@ try {
 
 		// if less than six posts in 60 seconds arrived, we add one filter
 		if(countFrame < 6) {
-			iFilter++;
-			updateStream(countFrame);
+			if(iFilter < arrTwitterFilters.length) {
+				iFilter++;
+				updateStream(countFrame);
+			} else console.log('Reached maximum available streams! ('+iFilter+')')
 
 		// if more than thirty posts in 60 seconds arrived, we remove one filter
 		} else if(countFrame > 30) {
@@ -103,6 +106,7 @@ try {
 	}, 60000);
 
 } catch(err) {
+	console('ERROR: Elvis has left the building :(');
 	console.error(err.stack);
 	process.exit(1);
 }
