@@ -91,15 +91,15 @@ try {
 	updateStream();
 	setInterval(() => {
 
-		// if less than six posts in 60 seconds arrived, we add one filter
-		if(countFrame < 6) {
+		// if less than five posts in 60 seconds arrived, we add one filter
+		if(countFrame < 5) {
 			if(iFilter < arrTwitterFilters.length) {
 				iFilter++;
 				updateStream(countFrame);
 			} else console.log('Reached maximum available streams! ('+iFilter+')')
 
-		// if more than thirty posts in 60 seconds arrived, we remove one filter
-		} else if(countFrame > 30) {
+		// if more than fifteen posts in 60 seconds arrived, we remove one filter
+		} else if(countFrame > 15) {
 			iFilter--;
 			updateStream(countFrame);
 		}
